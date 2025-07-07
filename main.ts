@@ -149,48 +149,56 @@ namespace grove {
 
         read(): number {
             let data = 0, result = 0;
-
-            data = this.paj7620ReadReg(0x43);
+            let errorCount = 0;
+            try {
+                data = this.paj7620ReadReg(0x43);
+            } catch (e) {
+                // I2C error, try to re-init sensor
+                this.paj7620Init();
+                basic.pause(50);
+                errorCount++;
+                if (errorCount > 3) return GroveGesture.None;
+                return GroveGesture.None;
+            }
             switch (data) {
                 case 0x01:
                     result = GroveGesture.Right;
                     break;
-
                 case 0x02:
                     result = GroveGesture.Left;
                     break;
-
                 case 0x04:
                     result = GroveGesture.Up;
                     break;
-
                 case 0x08:
                     result = GroveGesture.Down;
                     break;
-
                 case 0x10:
                     result = GroveGesture.Forward;
                     break;
-
                 case 0x20:
                     result = GroveGesture.Backward;
                     break;
-
                 case 0x40:
                     result = GroveGesture.Clockwise;
                     break;
-
                 case 0x80:
                     result = GroveGesture.Anticlockwise;
                     break;
-
                 default:
-                    data = this.paj7620ReadReg(0x44);
+                    try {
+                        data = this.paj7620ReadReg(0x44);
+                    } catch (e) {
+                        this.paj7620Init();
+                        basic.pause(50);
+                        errorCount++;
+                        if (errorCount > 3) return GroveGesture.None;
+                        return GroveGesture.None;
+                    }
                     if (data == 0x01)
                         result = GroveGesture.Wave;
                     break;
             }
-
             return result;
         }
     }
@@ -636,13 +644,29 @@ namespace grove {
         if (!gesturePollingStarted) {
             gesturePollingStarted = true;
             control.inBackground(() => {
+                let errorCount = 0;
                 while (true) {
-                    const gesture = paj7620.read();
+                    let gesture = GroveGesture.None;
+                    try {
+                        gesture = paj7620.read();
+                        errorCount = 0; // reset error count on success
+                    } catch (e) {
+                        errorCount++;
+                        if (errorCount > 3) {
+                            // Too many errors, try to re-init sensor
+                            paj7620.init();
+                            errorCount = 0;
+                            basic.pause(1000);
+                        }
+                        gesture = GroveGesture.None;
+                    }
                     if (gesture != lastGesture) {
                         lastGesture = gesture;
                         control.raiseEvent(gestureEventId, lastGesture);
+                        basic.pause(50); // Pause for 50ms after detecting a gesture
+                    } else {
+                        basic.pause(10); // Shorter pause if no gesture change
                     }
-                    basic.pause(50);
                 }
             });
         }
