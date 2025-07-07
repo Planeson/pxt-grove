@@ -1,3 +1,6 @@
+Fork: fix multiple gesture in succession causing error 020 - out of memory.
+Fix: lock polling function out if another instance is already running.
+
 # Grove
 
 A Microsoft MakeCode package for for Seeed Studio Grove module.
